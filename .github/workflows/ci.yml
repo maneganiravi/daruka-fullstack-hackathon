@@ -1,0 +1,83 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  backend-checks:
+    name: Backend Tests & Linting
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgis/postgis:15-3.3
+        env:
+          POSTGRES_USER: daruka_user
+          POSTGRES_PASSWORD: daruka_password
+          POSTGRES_DB: daruka_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov flake8 httpx
+
+      - name: Run Flake8 Linter
+        working-directory: ./backend
+        run: |
+          flake8 . --count --max-line-length=120 --statistics
+
+      - name: Run Pytest Test Suite
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://daruka_user:daruka_password@localhost:5432/daruka_db
+          JWT_SECRET_KEY: test_secret_key_ci_cd_environment_12345
+          ENVIRONMENT: test
+        run: |
+          pytest --cov=app --cov-report=term-missing
+
+  frontend-checks:
+    name: Frontend Lint & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './frontend/package.json'
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: ./frontend
+        run: npm run lint
+
+      - name: Run Build
+        working-directory: ./frontend
+        run: npm run build
