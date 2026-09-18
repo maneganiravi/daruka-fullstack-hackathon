@@ -12,10 +12,15 @@ CDP_PORT = 9222
 BASE_URL = "http://localhost:5173"
 ARTIFACT_DIR = r"C:\Users\M.Ravi kumar\.gemini\antigravity-ide\brain\256b716e-d3e4-4ffd-975e-94ed31bca9f0"
 
+
 async def test_draw_flow():
     user_data = os.path.abspath("chrome_temp_draw_flow")
     os.makedirs(user_data, exist_ok=True)
-    subprocess.run(["powershell", "-Command", "Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    ps_cmd = [
+        "powershell", "-Command",
+        "Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force"
+    ]
+    subprocess.run(ps_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(1)
 
     proc = subprocess.Popen([
@@ -35,6 +40,7 @@ async def test_draw_flow():
 
         async with websockets.connect(ws_url, max_size=20 * 1024 * 1024) as ws:
             msg_id = 0
+
             async def send_cmd(method, params=None):
                 nonlocal msg_id
                 msg_id += 1
@@ -51,7 +57,7 @@ async def test_draw_flow():
             # Login
             await send_cmd("Page.navigate", {"url": f"{BASE_URL}/login"})
             await asyncio.sleep(1)
-            
+
             auth_setup = """
             (async () => {
                 const res = await fetch('http://localhost:8000/api/auth/login', {
@@ -71,7 +77,8 @@ async def test_draw_flow():
             # Open Draw Site Modal
             open_modal = """
             (() => {
-                const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Draw Site'));
+                const btn = Array.from(document.querySelectorAll('button'))
+                    .find(b => b.textContent.includes('Draw Site'));
                 if (btn) btn.click();
                 return !!btn;
             })()
@@ -94,20 +101,24 @@ async def test_draw_flow():
                 };
             })()
             """
-            rect_res = (await send_cmd("Runtime.evaluate", {"expression": get_coords, "returnByValue": True})).get("result", {}).get("value", {})
+            eval_result = await send_cmd(
+                "Runtime.evaluate",
+                {"expression": get_coords, "returnByValue": True}
+            )
+            rect_res = eval_result.get("result", {}).get("value", {})
             print("Modal Map Canvas Bounding Box:", rect_res)
 
             if rect_res:
                 cx = rect_res["left"] + rect_res["width"] * 0.3
                 cy = rect_res["top"] + rect_res["height"] * 0.5
-                
+
                 # Points to draw a polygon
                 points = [
                     (cx, cy),
                     (cx + 100, cy),
                     (cx + 100, cy + 80),
                     (cx, cy + 80),
-                    (cx, cy) # Close polygon
+                    (cx, cy)  # Close polygon
                 ]
 
                 print("Simulating polygon drawing clicks...")
@@ -131,7 +142,7 @@ async def test_draw_flow():
                 await asyncio.sleep(1)
 
                 # Inspect if area updated
-                check_area = """
+                check_area = r"""
                 (() => {
                     const text = document.querySelector('.modal-content')?.innerText || '';
                     const match = text.match(/([0-9.]+)\s*ha/);
@@ -142,7 +153,11 @@ async def test_draw_flow():
                     };
                 })()
                 """
-                area_res = (await send_cmd("Runtime.evaluate", {"expression": check_area, "returnByValue": True})).get("result", {}).get("value", {})
+                eval_result = await send_cmd(
+                    "Runtime.evaluate",
+                    {"expression": check_area, "returnByValue": True}
+                )
+                area_res = eval_result.get("result", {}).get("value", {})
                 print("Calculated Area in UI:", area_res.get("areaFound"), "ha")
 
                 # Capture screenshot of drawn polygon in modal
@@ -155,6 +170,7 @@ async def test_draw_flow():
 
     finally:
         proc.kill()
+
 
 if __name__ == "__main__":
     asyncio.run(test_draw_flow())

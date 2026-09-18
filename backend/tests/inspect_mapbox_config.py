@@ -10,10 +10,12 @@ CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 CDP_PORT = 9222
 BASE_URL = "http://localhost:5173"
 
+
 async def main():
     user_data = os.path.abspath("chrome_temp_config")
     os.makedirs(user_data, exist_ok=True)
-    subprocess.run(["powershell", "-Command", "Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    cmd = ["powershell", "-Command", "Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force"]
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(1)
 
     proc = subprocess.Popen([
@@ -33,6 +35,7 @@ async def main():
 
         async with websockets.connect(ws_url) as ws:
             msg_id = 0
+
             async def send_cmd(method, params=None):
                 nonlocal msg_id
                 msg_id += 1
@@ -41,6 +44,7 @@ async def main():
                 while True:
                     resp = json.loads(await ws.recv())
                     if resp.get("id") == msg_id:
+
                         return resp.get("result", {})
 
             await send_cmd("Page.enable")

@@ -10,10 +10,12 @@ CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 CDP_PORT = 9222
 BASE_URL = "http://localhost:5173"
 
+
 async def main():
     user_data = os.path.abspath("chrome_temp_diag_mapbox")
     os.makedirs(user_data, exist_ok=True)
-    subprocess.run(["powershell", "-Command", "Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    cmd = ["powershell", "-Command", "Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force"]
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(1)
 
     proc = subprocess.Popen([
@@ -35,6 +37,7 @@ async def main():
 
         async with websockets.connect(ws_url) as ws:
             msg_id = 0
+
             async def send_cmd(method, params=None):
                 nonlocal msg_id
                 msg_id += 1
@@ -43,6 +46,7 @@ async def main():
                 while True:
                     resp = json.loads(await ws.recv())
                     if resp.get("id") == msg_id:
+
                         return resp.get("result", {})
 
             await send_cmd("Page.enable")
@@ -52,7 +56,7 @@ async def main():
             # Setup login
             await send_cmd("Page.navigate", {"url": f"{BASE_URL}/login"})
             await asyncio.sleep(1)
-            
+
             auth_setup = """
             (async () => {
                 const res = await fetch('http://localhost:8000/api/auth/login', {
@@ -74,7 +78,7 @@ async def main():
             (() => {
                 const map = window.__debug_map;
                 if (!map) return { error: "window.__debug_map not found" };
-                
+
                 const style = map.getStyle();
                 const isLoaded = map.loaded();
                 const isStyleLoaded = map.isStyleLoaded();
@@ -84,7 +88,7 @@ async def main():
                 const bounds = map.getBounds();
                 const canvas = map.getCanvas();
                 const gl = canvas.getContext('webgl') || canvas.getContext('webgl2');
-                
+
                 return {
                     isLoaded,
                     isStyleLoaded,
@@ -93,7 +97,9 @@ async def main():
                     zoom,
                     bounds: bounds ? [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()] : null,
                     styleSources: style ? Object.keys(style.sources || {}) : null,
-                    styleLayers: style ? (style.layers || []).map(l => ({ id: l.id, type: l.type, source: l.source, visible: l.layout?.visibility || 'visible' })) : null,
+                    styleLayers: style ? (style.layers || []).map(l => ({
+                        id: l.id, type: l.type, source: l.source, visible: l.layout?.visibility || 'visible'
+                    })) : null,
                     canvas: {
                         width: canvas.width,
                         height: canvas.height,

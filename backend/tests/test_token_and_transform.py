@@ -10,10 +10,15 @@ CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 CDP_PORT = 9222
 BASE_URL = "http://localhost:5173"
 
+
 async def test_mapbox_in_browser(token, intercept_sessions=False):
     user_data = os.path.abspath("chrome_temp_test_token")
     os.makedirs(user_data, exist_ok=True)
-    subprocess.run(["powershell", "-Command", "Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    ps_cmd = [
+        "powershell", "-Command",
+        "Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force"
+    ]
+    subprocess.run(ps_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(1)
 
     proc = subprocess.Popen([
@@ -33,6 +38,7 @@ async def test_mapbox_in_browser(token, intercept_sessions=False):
 
         async with websockets.connect(ws_url) as ws:
             msg_id = 0
+
             async def send_cmd(method, params=None):
                 nonlocal msg_id
                 msg_id += 1
@@ -50,7 +56,7 @@ async def test_mapbox_in_browser(token, intercept_sessions=False):
             # Route to test page
             await send_cmd("Page.navigate", {"url": f"{BASE_URL}/login"})
             await asyncio.sleep(1)
-            
+
             # Login and inject token
             auth_script = f"""
             (async () => {{
@@ -75,10 +81,10 @@ async def test_mapbox_in_browser(token, intercept_sessions=False):
                 if (!canvas) return { error: 'No canvas' };
                 const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
                 if (!gl) return { error: 'No WebGL context' };
-                
+
                 const pixels = new Uint8Array(4 * 10 * 10);
                 gl.readPixels(100, 100, 10, 10, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-                
+
                 let nonZero = 0;
                 for (let i = 0; i < pixels.length; i += 4) {
                     const r = pixels[i], g = pixels[i+1], b = pixels[i+2], a = pixels[i+3];
@@ -97,6 +103,7 @@ async def test_mapbox_in_browser(token, intercept_sessions=False):
 
     finally:
         proc.kill()
+
 
 if __name__ == "__main__":
     asyncio.run(test_mapbox_in_browser(""))

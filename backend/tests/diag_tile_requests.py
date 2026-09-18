@@ -9,10 +9,11 @@ import websockets
 CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 CDP_PORT = 9222
 
+
 async def main():
     user_data = os.path.abspath("chrome_temp_profile_diag")
     os.makedirs(user_data, exist_ok=True)
-    
+
     proc = subprocess.Popen([
         CHROME_PATH,
         f"--remote-debugging-port={CDP_PORT}",
@@ -24,18 +25,18 @@ async def main():
         "--no-default-browser-check",
         "--window-size=1400,900"
     ])
-    
+
     time.sleep(2)
-    
+
     try:
         async with httpx.AsyncClient() as client:
             res = await client.get(f"http://127.0.0.1:{CDP_PORT}/json")
             tabs = res.json()
             ws_url = tabs[0]["webSocketDebuggerUrl"]
-            
+
         async with websockets.connect(ws_url) as ws:
             msg_id = 0
-            
+
             async def send_cmd(method, params=None):
                 nonlocal msg_id
                 msg_id += 1
@@ -46,11 +47,11 @@ async def main():
             await send_cmd("Page.enable")
             await send_cmd("Runtime.enable")
             await send_cmd("Network.enable")
-            
+
             # Setup login
             await send_cmd("Page.navigate", {"url": "http://localhost:5173/login"})
             await asyncio.sleep(1)
-            
+
             auth_setup = """
             (async () => {
                 const res = await fetch('http://localhost:8000/api/auth/login', {
@@ -65,10 +66,10 @@ async def main():
             })()
             """
             await send_cmd("Runtime.evaluate", {"expression": auth_setup, "awaitPromise": True})
-            
+
             # Navigate to map
             await send_cmd("Page.navigate", {"url": "http://localhost:5173/map"})
-            
+
             # Listen to messages for 8 seconds
             end_time = time.time() + 8
             while time.time() < end_time:
@@ -76,16 +77,21 @@ async def main():
                     raw = await asyncio.wait_for(ws.recv(), timeout=1.0)
                     msg = json.loads(raw)
                     method = msg.get("method", "")
-                    
+
                     if method == "Runtime.consoleAPICalled":
-                        args = [str(a.get("value", a.get("description", ""))) for a in msg.get("params", {}).get("args", [])]
+                        args = [
+                            str(a.get("value", a.get("description", "")))
+                            for a in msg.get("params", {}).get("args", [])
+                        ]
                         print(f"[CONSOLE {msg['params']['type'].upper()}]: {' '.join(args)}")
                     elif method == "Runtime.exceptionThrown":
                         print(f"[EXCEPTION]: {msg.get('params', {}).get('exceptionDetails', {})}")
                     elif method == "Network.responseReceived":
                         url = msg.get("params", {}).get("response", {}).get("url", "")
                         status = msg.get("params", {}).get("response", {}).get("status", "")
-                        if "arcgis" in url.lower() or "mapbox" in url.lower() or "carto" in url.lower() or "openstreetmap" in url.lower() or "tile" in url.lower():
+                        lower_url = url.lower()
+                        keywords = ("arcgis", "mapbox", "carto", "openstreetmap", "tile")
+                        if any(kw in lower_url for kw in keywords):
                             print(f"[NET RESPONSE {status}]: {url}")
                     elif method == "Network.loadingFailed":
                         params = msg.get("params", {})
@@ -117,7 +123,8 @@ async def main():
             while True:
                 resp = json.loads(await ws.recv())
                 if resp.get("id") == eval_id:
-                    print("Map canvas DOM check:", json.dumps(resp.get("result", {}).get("result", {}).get("value", {}), indent=2))
+                    val = resp.get("result", {}).get("result", {}).get("value", {})
+                    print("Map canvas DOM check:", json.dumps(val, indent=2))
                     break
 
     finally:

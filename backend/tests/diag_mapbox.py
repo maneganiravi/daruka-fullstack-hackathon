@@ -9,10 +9,11 @@ import websockets
 CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 CDP_PORT = 9222
 
+
 async def main():
     user_data = os.path.abspath("chrome_temp_profile")
     os.makedirs(user_data, exist_ok=True)
-    
+
     proc = subprocess.Popen([
         CHROME_PATH,
         f"--remote-debugging-port={CDP_PORT}",
@@ -24,18 +25,18 @@ async def main():
         "--no-default-browser-check",
         "--window-size=1400,900"
     ])
-    
+
     time.sleep(2)
-    
+
     try:
         async with httpx.AsyncClient() as client:
             res = await client.get(f"http://127.0.0.1:{CDP_PORT}/json")
             tabs = res.json()
             ws_url = tabs[0]["webSocketDebuggerUrl"]
-            
+
         async with websockets.connect(ws_url) as ws:
             msg_id = 0
-            
+
             async def send_cmd(method, params=None):
                 nonlocal msg_id
                 msg_id += 1
@@ -45,15 +46,15 @@ async def main():
                     resp = json.loads(await ws.recv())
                     if resp.get("id") == msg_id:
                         return resp.get("result", {})
-            
+
             await send_cmd("Page.enable")
             await send_cmd("Runtime.enable")
             await send_cmd("Network.enable")
-            
+
             # Setup session
             await send_cmd("Page.navigate", {"url": "http://localhost:5173/login"})
             await asyncio.sleep(2)
-            
+
             auth_setup = """
             (async () => {
                 const res = await fetch('http://localhost:8000/api/auth/login', {
@@ -70,13 +71,13 @@ async def main():
             await send_cmd("Runtime.evaluate", {"expression": auth_setup, "awaitPromise": True})
             await send_cmd("Page.navigate", {"url": "http://localhost:5173/"})
             await asyncio.sleep(4)
-            
+
             # Run deep Mapbox internal diagnostic in the browser
             diag_js = """
             (() => {
                 const mapEl = document.querySelector('.mapboxgl-map');
                 const canvas = document.querySelector('.mapboxgl-canvas');
-                
+
                 // Inspect window / mapbox internals
                 const debug = {
                     canvasExists: Boolean(canvas),
@@ -89,7 +90,7 @@ async def main():
                     mapElChildren: mapEl ? Array.from(mapEl.children).map(c => c.className) : [],
                     webglContextAttributes: null,
                 };
-                
+
                 if (canvas) {
                     try {
                         const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
@@ -103,13 +104,13 @@ async def main():
                         debug.webglError = e.message;
                     }
                 }
-                
+
                 return debug;
             })()
             """
             diag_res = await send_cmd("Runtime.evaluate", {"expression": diag_js, "returnByValue": True})
             print(f"MAPBOX DEEP DIAGNOSTIC:\n{json.dumps(diag_res.get('result', {}).get('value', {}), indent=2)}")
-            
+
     finally:
         proc.kill()
 

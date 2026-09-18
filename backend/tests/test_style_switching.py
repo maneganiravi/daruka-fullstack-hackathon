@@ -12,10 +12,15 @@ CDP_PORT = 9222
 BASE_URL = "http://localhost:5173"
 ARTIFACT_DIR = r"C:\Users\M.Ravi kumar\.gemini\antigravity-ide\brain\256b716e-d3e4-4ffd-975e-94ed31bca9f0"
 
+
 async def test_styles():
     user_data = os.path.abspath("chrome_temp_styles")
     os.makedirs(user_data, exist_ok=True)
-    subprocess.run(["powershell", "-Command", "Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    ps_cmd = [
+        "powershell", "-Command",
+        "Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force"
+    ]
+    subprocess.run(ps_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(1)
 
     proc = subprocess.Popen([
@@ -35,6 +40,7 @@ async def test_styles():
 
         async with websockets.connect(ws_url, max_size=20 * 1024 * 1024) as ws:
             msg_id = 0
+
             async def send_cmd(method, params=None):
                 nonlocal msg_id
                 msg_id += 1
@@ -51,7 +57,7 @@ async def test_styles():
             # Login & Navigate to Map Explorer
             await send_cmd("Page.navigate", {"url": f"{BASE_URL}/login"})
             await asyncio.sleep(1)
-            
+
             auth_setup = """
             (async () => {
                 const res = await fetch('http://localhost:8000/api/auth/login', {
@@ -110,6 +116,7 @@ async def test_styles():
 
     finally:
         proc.kill()
+
 
 if __name__ == "__main__":
     asyncio.run(test_styles())

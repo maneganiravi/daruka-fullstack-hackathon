@@ -10,6 +10,7 @@ CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 CDP_PORT = 9222
 BASE_URL = "http://localhost:5173"
 
+
 async def run_frontend_audit():
     print("==================================================")
     print("      DARUKAA.EARTH FRONTEND FULL SYSTEM AUDIT    ")
@@ -19,7 +20,11 @@ async def run_frontend_audit():
     os.makedirs(user_data, exist_ok=True)
 
     # Clean any lingering Chrome instances
-    subprocess.run(["powershell", "-Command", "Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    ps_cmd = [
+        "powershell", "-Command",
+        "Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force"
+    ]
+    subprocess.run(ps_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(1)
 
     proc = subprocess.Popen([
@@ -70,6 +75,7 @@ async def run_frontend_audit():
 
             # Collect console errors
             console_errors = []
+
             async def check_messages():
                 while True:
                     try:
@@ -311,6 +317,7 @@ async def run_frontend_audit():
     fail_cnt = sum(1 for r in audit_log if r["status"] == "FAIL")
     print(f"FRONTEND AUDIT SUMMARY: {pass_cnt} PASSED / {fail_cnt} FAILED")
     print("==================================================")
+
 
 if __name__ == "__main__":
     asyncio.run(run_frontend_audit())

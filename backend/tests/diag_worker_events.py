@@ -10,10 +10,12 @@ CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 CDP_PORT = 9222
 BASE_URL = "http://localhost:5173"
 
+
 async def main():
     user_data = os.path.abspath("chrome_temp_worker_test")
     os.makedirs(user_data, exist_ok=True)
-    subprocess.run(["powershell", "-Command", "Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    cmd = ["powershell", "-Command", "Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force"]
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(1)
 
     proc = subprocess.Popen([
@@ -33,6 +35,7 @@ async def main():
 
         async with websockets.connect(ws_url) as ws:
             msg_id = 0
+
             async def send_cmd(method, params=None):
                 nonlocal msg_id
                 msg_id += 1
@@ -46,12 +49,15 @@ async def main():
             await send_cmd("Page.enable")
             await send_cmd("Runtime.enable")
             await send_cmd("Network.enable")
-            await send_cmd("Target.setAutoAttach", {"autoAttach": True, "waitForDebuggerOnStart": False, "flatten": True})
+            await send_cmd(
+                "Target.setAutoAttach",
+                {"autoAttach": True, "waitForDebuggerOnStart": False, "flatten": True}
+            )
 
             # Setup login
             await send_cmd("Page.navigate", {"url": f"{BASE_URL}/login"})
             await asyncio.sleep(1)
-            
+
             auth_setup = """
             (async () => {
                 const res = await fetch('http://localhost:8000/api/auth/login', {
@@ -66,7 +72,7 @@ async def main():
             })()
             """
             await send_cmd("Runtime.evaluate", {"expression": auth_setup, "awaitPromise": True})
-            
+
             # Listen to ALL events for 6 seconds
             end_time = time.time() + 6
             while time.time() < end_time:
@@ -78,10 +84,11 @@ async def main():
                         print(f"[{method}]:", msg)
                     elif method == "Network.requestWillBeSent":
                         url = msg.get("params", {}).get("request", {}).get("url", "")
-                        if not url.startswith("data:") and not "node_modules" in url and not "src/" in url:
+                        if not url.startswith("data:") and "node_modules" not in url and "src/" not in url:
                             print(f"[NET REQ]: {url}")
                     elif method == "Network.loadingFailed":
-                        print(f"[NET FAILED]:", msg.get("params"))
+                        print("[NET FAILED]:", msg.get("params"))
+
                 except asyncio.TimeoutError:
                     pass
 
