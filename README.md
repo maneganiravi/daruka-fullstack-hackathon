@@ -157,7 +157,7 @@ pip install -r requirements.txt
 python -m uvicorn app.main:app --reload --port 8000
 ```
 
-> **API Documentation**: Open your browser at **http://localhost:8000/docs** to explore interactive Swagger OpenAPI documentation.
+> **API Documentation**: Open your browser at **http://127.0.0.1:8001/docs** to explore interactive Swagger OpenAPI documentation.
 
 ---
 
