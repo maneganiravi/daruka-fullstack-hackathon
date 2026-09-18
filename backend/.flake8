@@ -1,6 +1,6 @@
 [flake8]
 max-line-length = 120
-exclude = 
+exclude =
     venv,
     .venv,
     __pycache__,
@@ -8,3 +8,5 @@ exclude =
     build,
     dist
 extend-ignore = E203, W503
+per-file-ignores =
+    tests/*: E501, E303, F541, W291, W293
